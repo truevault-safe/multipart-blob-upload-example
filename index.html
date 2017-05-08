@@ -7,25 +7,11 @@
     <meta name="description" content="">
 
     <script>
-        // NOTE- This is Proof Of Concept code intended to demonstrate how one could upload large files to TrueVault
-        // by splitting them into several small files. This is not intended as a reference for production code.
-        // We recommend thorough error handling and retry logic for production code.
-
-        // Saving Overview:
-        // 1) Select a file to upload
-        // 2) Split that file into moderately sized chunks (configurable below)
-        // 3) Upload each chunk in parallel
-        // 4) Collect BLOB ids for each chunk, and save them in a metadata Document (order matters!)
-        // 5) Store the metadata Document
-        // Retrieving Overview:
-        // 1) Load the metadata object
-        // 2) Download each BLOB based on the ids in the metadata object (order matters!)
-        // 3) Combine the resulting data into a JavaScript `Blob`
-        // 4) Save that JS Blob to disk with the original file name (not necessary if you show file inline).
+        // NOTE: This is a POC example implementation, not for production use. See README
 
         // Constants for determining chunk size
         const MEGABYTE = 1024 * 1024;
-        const CHUNK_SIZE = 10 * MEGABYTE;
+        const CHUNK_SIZE = 20 * MEGABYTE;
 
         // -----------------------------------
         // Begin TrueVault API Call Wrappers
@@ -53,7 +39,7 @@
                     } else {
                         return json.document_id;
                     }
-                });
+                })
         };
 
         // Read a JSON document from TrueVault
@@ -66,8 +52,13 @@
                 headers: headers
             });
             return fetch(request)
-                .then(response => response.text())
-                .then(responseText => JSON.parse(atob(responseText)));
+                .then(response => {
+                    if (response.status === 200) {
+                        return response.text();
+                    } else {
+                        return Promise.reject(`Request returned ${response.status}`)
+                    }
+                }).then(responseText => JSON.parse(atob(responseText)));
         };
 
         // Read a BLOB from TrueVault
@@ -80,7 +71,13 @@
                 headers: headers
             });
             return fetch(request)
-                .then(response => response.blob());
+                .then(response => {
+                    if (response.status === 200) {
+                        return response.blob();
+                    } else {
+                        return Promise.reject(`Request returned ${response.status}`)
+                    }
+                });
         };
 
         // Write a BLOB to TrueVault
@@ -145,8 +142,12 @@
             readDocument(token, vaultId, metadataDocumentId).then(function (docjson) {
                 const blobIds = docjson.blob_ids;
                 const blobName = docjson.blob_name;
-                const blobPromises = blobIds.map(bid => readBlob(token, vaultId, bid));
                 updateStatus(`Waiting to download all parts`);
+                const blobPromises = blobIds.map(bid => {
+                    return readBlob(token, vaultId, bid).catch(function () {
+                        alert("Failed to read blob, check inputs & console");
+                    });
+                });
                 Promise.all(blobPromises).then(function (blobParts) {
                     var combinedBlob = new Blob(blobParts, {
                         type: 'application/octet-stream',
@@ -155,7 +156,10 @@
                     saveBlobFile(combinedBlob, blobName);
                     updateStatus(`Saved download to disk.`);
                 });
+            }).catch(function () {
+                alert("Failed to read metadata document, check inputs & console");
             });
+            ;
 
         };
 
@@ -174,7 +178,11 @@
                 const chunkValue = file.slice(currentChunk * CHUNK_SIZE, (currentChunk + 1) * CHUNK_SIZE);
                 const name = `${file.name}.part${currentChunk}`;
                 // Do the create blob, add the promise to the list
-                uploadPromises.push(createBlob(apiKey, vaultId, name, chunkValue));
+                uploadPromises.push(
+                    createBlob(apiKey, vaultId, name, chunkValue).catch(function () {
+                        alert("Failed to create blobs, check inputs & console");
+                    })
+                );
             }
             updateStatus(`Waiting for ${chunkCount} parts to upload`);
 
@@ -184,6 +192,8 @@
                 return createDocument(apiKey, vaultId, {
                     blob_ids: blobIds,
                     blob_name: file.name
+                }).catch(function () {
+                    alert("Failed to create metadata document, check inputs & console");
                 });
             })
         };
