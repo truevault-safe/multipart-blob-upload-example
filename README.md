@@ -23,6 +23,24 @@ To retrieve the saved file, we follow these steps:
 
 
 # Usage
-To use this sample code, you'll need a TrueVault account where you can create a Vault, then create a user who can Create and Read all Documents/BLOBs in that Vault. You need to generate an API Key fro that user in the console or through the API, then enter the API Key and Vault Id into the form to test.
+To use this sample code, you'll need a TrueVault account where you can create a Vault, then create a user who can Create and Read all Documents/BLOBs in that Vault. Here's an example minimal policy that should work (put your vault id in place of the 000s):
+
+```
+[{
+   "Resources": [
+       "Vault::00000000-0000-0000-0000-00000000000::Document::,
+       "Vault::00000000-0000-0000-0000-00000000000::Blob::,
+   ],
+   "Activities": "CR"
+},{
+    "Resources": [
+       "Vault::00000000-0000-0000-0000-00000000000::Document::.*,
+       "Vault::00000000-0000-0000-0000-00000000000::Blob::.*,
+   ],
+   "Activities": "R"
+}]
+```
+
+You need to generate an API Key for that user in the console or through the API, then enter the API Key and Vault Id into the form to test.
 
 
